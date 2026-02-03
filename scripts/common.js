@@ -3,6 +3,14 @@
     stroke: '#ffffff',
     baseFill: '#000000',
     regularFill: 'red',
+    hoverFill: "rgba(192, 57, 43, 1)",
+    currentFill: "rgb(93, 90, 252)",
+    targetFill: 'rgb(149, 148, 214)',
+    tileType: {
+      hover: 'HOVER',
+      target: 'TARGET',
+      current: 'CURRENT'
+    },
     oddFill: 'white',
     canvas: null,
     ctx: null,
@@ -19,8 +27,10 @@
     hoverTileY: -1,
     cells: 0,
     rows: 0,
-    grig: null,
-    isMouseDown: false
+    grid: null,
+    isMouseDown: false,
+    currentPos: { x: 0, y: 0 },
+    targetPos: { x: -1, y: -1 }
   };
 
   window.baseSettings = baseSettings;
@@ -60,7 +70,7 @@
         this.grid.push(row);
       }
       baseSettings.grid = grid;
-      console.log('qwe')
+      // console.log('qwe')
     }
 
     updateHover() {
@@ -72,10 +82,15 @@
       baseSettings.hoverTileX = Math.floor(currentY / tileHeight + currentX / tileWidth) + 1;
       baseSettings.hoverTileY = Math.floor(-currentX / tileWidth + currentY / tileHeight);
 
-      if (isMouseDown) {
-        console.log('yeaahahah');
-        // baseSettings.isMouseDown = false;
-      }
+      // if (isMouseDown) {
+      //   // console.log('yeaahahah');
+      //   // baseSettings.isMouseDown = false;
+      //   baseSettings.currentPos.x = hoverTileX;
+      //   baseSettings.currentPos.y = hoverTileY;
+      //   console.log('click!', {
+      //     currentPos:baseSettings.currentPos
+      //   })
+      // }
 
     }
 
@@ -96,7 +111,6 @@
         this.displayGrid();
       });
     }
-
   }
 
   class Tile {
@@ -144,12 +158,62 @@
       }
     }
 
-    drawHoverTile(x, y) {
+    moveCurrentToTarget(from, to) {
+      const { tileType, currentPos } = baseSettings;
+      // console.log('asdasd', {from,to});
+      let intervalId = null;
+      // let bufferX = null || 0;
+      // let bufferY = null || 0;
+      let bufferX = currentPos.x;
+      let bufferY = currentPos.y;
+
+
+      if (from.x < to.x && from.y < to.y) {
+        // intervalId = setInterval(() => {
+        bufferX = from.x + 1;
+        bufferY = from.y + 1;
+        // }, 1000);
+      }
+
+      
+
+      // if (from.y < to.y && from.x === to.x) {
+      //   bufferY = from.y + 1;
+      // }
+      // if (from.x === to.x && from.y === to.y) {
+
+      //   bufferX = from.x;
+      //   bufferY = from.y;
+      //   // intervalId = setInterval(() => {
+      //   // this.drawHoverTile(from.x, from.y, tileType.current);
+      //   // // console.log(currentPos);
+      //   // }, 1000);
+      // }
+      // if (to.x <= from.x && to.y <= from.y) {
+      //   this.drawHoverTile(from.x - 1, from.y - 1, tileType.current);
+      // }
+
+      this.drawHoverTile(bufferX, bufferY, tileType.current);
+      baseSettings.currentPos.x = bufferX;
+      baseSettings.currentPos.y = bufferY;
+      // console.log(currentPos);
+
+
+      // clearInterval(intervalId);
+    }
+
+    drawHoverTile(x, y, type) {
+      if (x < 0 || y < 0) {
+        return null;
+      }
+
       const { ctx, grid: { grid } } = baseSettings;
       const hoveredCell = grid[x][y].tilePoints;
       const topFace = new Path2D();
+
       ctx.beginPath();
-      ctx.fillStyle = "rgba(192, 57, 43, 0.4)";
+      const fill = getTileColorByType(type)
+      ctx.fillStyle = fill;
       topFace.moveTo(hoveredCell.top.x, hoveredCell.top.y);
       topFace.lineTo(hoveredCell.right.x, hoveredCell.right.y);
       topFace.lineTo(hoveredCell.bottom.x, hoveredCell.bottom.y);
@@ -160,7 +224,7 @@
     }
 
     drawTile() {
-      const { ctx, isMouseDown, tileHalfHeight, tileHalfWidth, tileWidth, yStart, xStart, hoverTileX, hoverTileY, cells, rows } = baseSettings;
+      const { ctx, isMouseDown, tileHalfHeight, tileHalfWidth, tileWidth, yStart, xStart, hoverTileX, hoverTileY, cells, rows, currentPos, targetPos, tileType } = baseSettings;
       const xScreen = xStart + (this.rowNumber - this.cellNumber) * tileHalfWidth;
       const yScreen = yStart + (this.rowNumber + this.cellNumber) * tileHalfHeight;
       const xBottom = xScreen - tileHalfWidth;
@@ -169,11 +233,6 @@
       const xTop = xScreen - tileHalfWidth;
       const yTop = yScreen - tileHalfHeight;
       let yShift = 0;
-
-      if (isMouseDown) {
-        yShift = this.animate(this);
-      }
-
 
       this.tileCoords.top = yTop - yShift //top corner y coords
       this.tileCoords.right = xScreen //right corner x coords
@@ -196,10 +255,6 @@
       const rightFace = new Path2D();
       const leftFace = new Path2D();
 
-      if (hoverTileX >= 0 && hoverTileY >= 0 && hoverTileX <= cells && hoverTileY <= rows) {
-        this.drawHoverTile(hoverTileX, hoverTileY, yShift);
-      }
-      
       ctx.beginPath();
 
       topFace.moveTo(xScreen, yScreen - yShift); //right corner
@@ -231,7 +286,16 @@
       ctx.stroke(topFace);
       ctx.stroke(rightFace);
       ctx.stroke(leftFace);
+      ctx.fillStyle = 'blue';
+      this.drawHoverTile(targetPos.x, targetPos.y, tileType.target);
+      // this.drawHoverTile(currentPos.x, currentPos.y, tileType.current);
+      this.moveCurrentToTarget(currentPos, targetPos)
+      if (hoverTileX >= 0 && hoverTileY >= 0 && hoverTileX <= cells - 1 && hoverTileY <= rows - 1) {
+        this.drawHoverTile(hoverTileX, hoverTileY, tileType.hover);
+      }
       ctx.closePath();
+
+      
     }
   }
 
@@ -247,10 +311,30 @@
     }
   };
 
+  const getTileColorByType = (type) => {
+
+    const { tileType, currentFill, hoverFill, targetFill } = baseSettings
+
+    switch (type) {
+      case tileType.current: {
+        return currentFill
+        break;
+      }
+      case tileType.hover: {
+        return hoverFill
+        break;
+      }
+      case tileType.target: {
+        return targetFill
+        break;
+      }
+    }
+  };
+
   // helper functions section //
 
 
-  const grid = new Grid(50, 50);
+  const grid = new Grid(10, 10);
   grid.setup();
   grid.displayGrid();
   grid.updateHover();
@@ -313,7 +397,18 @@
   };
 
   window.onclick = () => {
-    baseSettings.isMouseDown = true;
+    const { targetPos, hoverTileX, hoverTileY,currentPos } = baseSettings;
+    console.log('targetPos', {
+      targetPos
+    })
+    if (targetPos.x !== -1 && targetPos.y !== -1) {
+      baseSettings.currentPos.x = targetPos.x; 
+      baseSettings.currentPos.y = targetPos.y; 
+    }
+    
+    targetPos.x = hoverTileX;
+    targetPos.y = hoverTileY;
+    console.log('baseSettings', { baseSettings, currentPos, targetPos });
   }
 
 })(window);
